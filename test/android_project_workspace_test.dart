@@ -13,12 +13,10 @@ void main() {
   });
 
   tearDown(() async {
-    if (await tempRoot.exists()) {
-      await tempRoot.delete(recursive: true);
-    }
+    if (await tempRoot.exists()) await tempRoot.delete(recursive: true);
   });
 
-  test('creates Android project structure', () async {
+  test('creates a native Android project skeleton', () async {
     final project = await workspace.createProject(
       name: 'Weather Demo',
       packageId: 'com.example.weatherdemo',
@@ -26,66 +24,50 @@ void main() {
 
     expect(await File('${project.path}/settings.gradle').exists(), isTrue);
     expect(await File('${project.path}/app/build.gradle').exists(), isTrue);
+    expect(await File('${project.path}/app/src/main/AndroidManifest.xml').exists(), isTrue);
     expect(
-      await File('${project.path}/app/src/main/AndroidManifest.xml').exists(),
+      await File('${project.path}/app/src/main/java/com/example/weatherdemo/MainActivity.java').exists(),
       isTrue,
     );
   });
 
-  test('rejects invalid package identifiers', () {
-    expect(
-      () => workspace.createProject(
-        name: 'Bad App',
-        packageId: 'not a package',
-      ),
+  test('rejects invalid package identifiers', () async {
+    await expectLater(
+      workspace.createProject(name: 'Bad App', packageId: 'not a package'),
       throwsArgumentError,
     );
   });
 
-  test('rejects duplicate project names', () async {
-    await workspace.createProject(
-      name: 'Notes',
-      packageId: 'com.example.notes',
-    );
+  test('does not overwrite an existing project', () async {
+    await workspace.createProject(name: 'Notes', packageId: 'com.example.notes');
 
-    expect(
-      () => workspace.createProject(
-        name: 'Notes',
-        packageId: 'com.example.notes2',
-      ),
+    await expectLater(
+      workspace.createProject(name: 'Notes', packageId: 'com.example.notes2'),
       throwsA(isA<FileSystemException>()),
     );
   });
 
-  test('supports project file read and write', () async {
+  test('writes and reads files inside the project', () async {
     final project = await workspace.createProject(
       name: 'Notes',
       packageId: 'com.example.notes',
     );
 
-    await workspace.writeTextFile(
-      project,
-      'app/src/main/assets/readme.txt',
-      'hello',
-    );
-
+    await workspace.writeTextFile(project, 'app/src/main/assets/readme.txt', 'hello');
     expect(
-      await workspace.readTextFile(
-        project,
-        'app/src/main/assets/readme.txt',
-      ),
+      await workspace.readTextFile(project, 'app/src/main/assets/readme.txt'),
       'hello',
     );
   });
 
-  test('blocks path traversal', () async {
+  test('blocks path traversal outside the project', () async {
     final project = await workspace.createProject(
       name: 'Notes',
       packageId: 'com.example.notes',
     );
 
-    expect(
-      () => workspace.writeTextFile(project, '../outside.txt', 'blocked'),
+    await expectLater(
+      workspace.writeTextFile(project, '../outside.txt', 'blocked'),
       throwsArgumentError,
     );
   });
